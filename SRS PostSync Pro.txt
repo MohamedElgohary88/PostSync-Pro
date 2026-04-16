@@ -1,0 +1,137 @@
+Software Requirements Specification (SRS)
+Project Name: [PostSync Pro]
+Version: 1.0.0
+Target Platform: Desktop Application (Windows, macOS, Linux)
+Architecture: Clean Architecture (Domain, Data, Presentation)
+
+1. Introduction
+1.1 Purpose
+SyncQA is an AI-powered QA Automation Desktop Application designed to bridge the gap between Business Requirements (SRS/Jira), API Contracts (Swagger/OpenAPI), and Testing Environments (Postman). It automates API validation, prevents data loss during Postman collection updates, and auto-generates fuzz tests.
+
+1.2 Tech Stack
+Language: Kotlin
+
+UI Framework: Compose (Compose for Desktop)
+
+Architecture: Clean Architecture, MVVM
+
+Networking: Ktor Client
+
+JSON Parsing: kotlinx.serialization (or Gson)
+
+Dependency Injection: Koin (recommended)
+
+AI Integration: Ktor Client for Cloud APIs (Google Gemini/Groq), llama.cpp Kotlin bindings for Local AI.
+
+2. Core Features & Functional Requirements
+Module 1: Postman Collection Sync Engine (The Core)
+FR-1.1: The system shall parse Postman Collection v2.1.0 and Swagger/OpenAPI v3.0 JSON files.
+
+FR-1.2: The system shall merge a new Swagger definition (or newer Postman collection) into an existing Postman collection.
+
+FR-1.3: During merging, the system MUST PRESERVE the tester’s custom data from the old collection, including:
+
+Custom Request Bodies (JSON/Form-data).
+
+Authorization Tokens / Headers.
+
+Pre-request scripts and Test scripts.
+
+Custom Collection Variables.
+
+FR-1.4: The system shall export the merged result as a valid Postman Collection v2.1.0 JSON file.
+
+Module 2: Dual-Mode AI Requirements Analyzer
+FR-2.1: The system shall extract business rules, required fields, and data types from raw text (SRS documents or Jira User Stories).
+
+FR-2.2: The system shall offer a "Strategy Pattern" for AI execution, allowing the user to choose between:
+
+Cloud Mode (BYOK): Uses an external API (e.g., Google Gemini or Groq). The user must input their own API Key, which the system encrypts and stores locally.
+
+Local Mode: Downloads a lightweight LLM (.gguf format, e.g., Llama 3 or Phi-3) to the local machine and runs it entirely offline for strict privacy.
+
+Module 3: 3-Way Matcher (SRS vs. Swagger)
+FR-3.1: The system shall compare the parameters extracted by the AI (from the SRS) with the exact endpoints and parameters defined in the Swagger file.
+
+FR-3.2: The system shall generate a Validation Report highlighting:
+
+Missing parameters in Swagger that exist in SRS.
+
+Required parameters in SRS marked as Optional in Swagger.
+
+Undocumented parameters in Swagger not mentioned in SRS.
+
+Module 4: Automated Fuzz Testing Engine
+FR-4.1: The system shall automatically generate mutated test cases for a specific endpoint based on its expected schema.
+
+FR-4.2: Test mutations shall include:
+
+Happy Path: All valid data.
+
+Null Values: Sending null for required fields.
+
+Empty Strings: Sending "" instead of valid strings.
+
+Type Mismatch: Sending integers instead of strings, etc.
+
+FR-4.3: The system shall execute these requests concurrently and display the HTTP status codes and responses in a results table.
+
+3. User Interface (UI) Specifications
+The UI will be built using Compose for Desktop, featuring a modern, dark-mode preferred layout with a sidebar navigation.
+
+3.1 Onboarding & Setup Screen
+Hardware Profiler: Detects System RAM and suggests Local or Cloud AI.
+
+AI Engine Selection: Radio buttons for "Local Offline AI" or "Cloud API".
+
+BYOK Input: A secure text field to input the Cloud API Key (if Cloud is selected), saved locally.
+
+3.2 Postman Sync Screen
+File Pickers: Two file selection buttons (1. Old Postman Collection, 2. New Swagger/Postman Collection).
+
+Sync Button: Triggers the merge logic.
+
+Log Console: A scrollable text area showing the merge process (e.g., "Preserved body for POST /login", "Added new endpoint GET /users").
+
+Export Button: Saves the newly merged collection to the local file system.
+
+3.3 SRS Validator Screen
+Text Input Area: A large text field to paste the User Story or SRS text.
+
+Target Endpoint Selector: A dropdown to select which endpoint from the parsed Swagger file corresponds to this SRS.
+
+Analyze Button: Triggers the AI extraction and matching logic.
+
+Results Dashboard: Visual cards or a table showing: Matches, Missing in Backend, and Type Conflicts.
+
+3.4 Fuzz Testing Screen
+Endpoint List: A sidebar listing all parsed endpoints.
+
+Test Configurator: Checkboxes to select mutation types (Nulls, Empty, Types).
+
+Run Tests Button.
+
+Results Table: A data table displaying columns: Test Type, Payload Sent, HTTP Status, Passed/Failed.
+
+4. Non-Functional Requirements (NFR)
+NFR-1 Privacy First: No user data, API keys, or uploaded files shall be sent to any server without explicit user action (i.e., using the Cloud AI API).
+
+NFR-2 Performance: JSON parsing and syncing of large collections (>10MB) must execute without blocking the main UI thread (use Kotlin Coroutines Dispatchers.IO).
+
+NFR-3 Security: API Keys stored locally must be encrypted.
+
+5. Expected Domain Layer Interfaces (Guidance for Code Generation)
+The AI assistant should generate the following core interfaces in the Domain layer:
+
+Kotlin
+interface PostmanSyncRepository {
+    suspend fun mergeCollections(oldCollection: Collection, newSwagger: Swagger): Collection
+}
+
+interface AiAnalyzerRepository {
+    suspend fun extractRulesFromText(text: String): List<SrsRule>
+}
+
+// Implementations of AiAnalyzerRepository should be separated into:
+// 1. CloudAiAnalyzerImpl (using Ktor + BYOK)
+// 2. LocalAiAnalyzerImpl (using gguf bindings)
