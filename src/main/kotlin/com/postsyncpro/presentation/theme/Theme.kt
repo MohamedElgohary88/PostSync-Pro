@@ -38,13 +38,21 @@ object BrandColors {
 }
 
 object HttpMethodColors {
-    val GET = Color(0xFF00C853)
-    val POST = Color(0xFFFFB74D)
-    val PUT = Color(0xFF42A5F5)
-    val DELETE = Color(0xFFEF5350)
-    val PATCH = Color(0xFFAB47BC)
-    val HEAD = Color(0xFF26C6DA)
-    val OPTIONS = Color(0xFF78909C)
+    val GET = Color(0xFF54D68A)
+    val POST = Color(0xFFFFC857)
+    val PUT = Color(0xFF63B3FF)
+    val DELETE = Color(0xFFFF707A)
+    val PATCH = Color(0xFFD58AF0)
+    val HEAD = Color(0xFF5ED7E5)
+    val OPTIONS = Color(0xFFAAB6C5)
+
+    private val LightGet = Color(0xFF087A3D)
+    private val LightPost = Color(0xFF8A4B00)
+    private val LightPut = Color(0xFF075FA8)
+    private val LightDelete = Color(0xFFB4232E)
+    private val LightPatch = Color(0xFF762A87)
+    private val LightHead = Color(0xFF006B75)
+    private val LightOptions = Color(0xFF4B5C6B)
 
     fun forMethod(method: String): Color = when (method.uppercase()) {
         "GET" -> GET
@@ -56,7 +64,25 @@ object HttpMethodColors {
         "OPTIONS" -> OPTIONS
         else -> Color(0xFF9E9E9E)
     }
+
+    fun forMethod(method: String, isDark: Boolean): Color {
+        if (isDark) return forMethod(method)
+        return when (method.uppercase()) {
+            "GET" -> LightGet
+            "POST" -> LightPost
+            "PUT" -> LightPut
+            "DELETE" -> LightDelete
+            "PATCH" -> LightPatch
+            "HEAD" -> LightHead
+            "OPTIONS" -> LightOptions
+            else -> Color(0xFF526170)
+        }
+    }
 }
+
+@Composable
+fun appHttpMethodColor(method: String): Color =
+    HttpMethodColors.forMethod(method, LocalAppPalette.current.isDark)
 
 object StatusColors {
     val Success = Color(0xFF00C853)
@@ -71,49 +97,49 @@ object StatusColors {
 
 // ─── Dark Theme Palette ─────────────────────────────────────────
 object DarkPalette {
-    val background = Color(0xFF111318)        // deeper, slightly blue-tinted
-    val surface = Color(0xFF1A1D24)           // card surfaces
-    val surfaceVariant = Color(0xFF22262E)    // secondary cards
-    val surfaceElevated = Color(0xFF282C35)   // elevated elements
-    val surfaceHover = Color(0xFF2E3340)      // hover states
-    val sidebar = Color(0xFF14161C)           // sidebar — darker than bg
-    val sidebarSelected = Color(0xFF1E2230)   // sidebar selected — accent hint
-    val topBar = Color(0xFF16181F)            // top bar
-    val border = Color(0xFF2A2E38)            // subtle borders
-    val borderSubtle = Color(0xFF1F2229)      // very subtle borders
-    val textPrimary = Color(0xFFF0F0F5)       // high-contrast text
-    val textSecondary = Color(0xFF9DA3B0)      // muted text
-    val textTertiary = Color(0xFF5E6370)       // hint text
+    val background = Color(0xFF0B0F16)
+    val surface = Color(0xFF121823)
+    val surfaceVariant = Color(0xFF192230)
+    val surfaceElevated = Color(0xFF202B3A)
+    val surfaceHover = Color(0xFF263345)
+    val sidebar = Color(0xFF0F141D)
+    val sidebarSelected = Color(0xFF202A46)
+    val topBar = Color(0xFF101620)
+    val border = Color(0xFF2C394B)
+    val borderSubtle = Color(0xFF1E2937)
+    val textPrimary = Color(0xFFF4F7FB)
+    val textSecondary = Color(0xFFB3BDCA)
+    val textTertiary = Color(0xFF8693A5)
     val textOnAccent = Color(0xFFFFFFFF)
-    val inputBackground = Color(0xFF16181F)
-    val inputBorder = Color(0xFF333845)
-    val scrollbar = Color(0xFF3A404D)
-    val divider = Color(0xFF22262E)
+    val inputBackground = Color(0xFF0E141E)
+    val inputBorder = Color(0xFF344459)
+    val scrollbar = Color(0xFF43536A)
+    val divider = Color(0xFF222E3E)
     val overlay = Color(0x80000000)
-    val codeBg = Color(0xFF13151B)            // code background
+    val codeBg = Color(0xFF0A1018)
 }
 
 object LightPalette {
-    val background = Color(0xFFF7F8FC)        // warm off-white
-    val surface = Color(0xFFFFFFFF)           // pure white cards
-    val surfaceVariant = Color(0xFFF0F2F8)    // secondary surfaces
+    val background = Color(0xFFF4F7FB)
+    val surface = Color(0xFFFFFFFF)
+    val surfaceVariant = Color(0xFFEEF2F7)
     val surfaceElevated = Color(0xFFFFFFFF)
-    val surfaceHover = Color(0xFFE8EBF4)      // hover — faint indigo tint
-    val sidebar = Color(0xFFFBFCFE)           // sidebar — near white
-    val sidebarSelected = Color(0xFFEEF0FF)   // sidebar selected — indigo tint
+    val surfaceHover = Color(0xFFE7ECF4)
+    val sidebar = Color(0xFFF9FBFD)
+    val sidebarSelected = Color(0xFFE8EAFF)
     val topBar = Color(0xFFFFFFFF)
-    val border = Color(0xFFE0E3ED)            // softer border
-    val borderSubtle = Color(0xFFEEF0F6)
-    val textPrimary = Color(0xFF0F172A)       // deep navy text
-    val textSecondary = Color(0xFF475569)
-    val textTertiary = Color(0xFF94A3B8)
+    val border = Color(0xFFD7DEE8)
+    val borderSubtle = Color(0xFFE8EDF3)
+    val textPrimary = Color(0xFF132033)
+    val textSecondary = Color(0xFF455468)
+    val textTertiary = Color(0xFF66758A)
     val textOnAccent = Color(0xFFFFFFFF)
-    val inputBackground = Color(0xFFF7F8FC)
-    val inputBorder = Color(0xFFCBD0DE)
-    val scrollbar = Color(0xFFCBD0DE)
-    val divider = Color(0xFFE4E7F0)
+    val inputBackground = Color(0xFFF8FAFC)
+    val inputBorder = Color(0xFFBCC7D5)
+    val scrollbar = Color(0xFFAAB6C5)
+    val divider = Color(0xFFDDE4EC)
     val overlay = Color(0x300F172A)
-    val codeBg = Color(0xFFF0F2F8)
+    val codeBg = Color(0xFFF1F4F8)
 }
 
 // ─── App Theme State ────────────────────────────────────────────
@@ -138,6 +164,13 @@ data class AppPalette(
     val divider: Color,
     val overlay: Color,
     val codeBg: Color,
+    val accent: Color,
+    val accentHover: Color,
+    val onAccent: Color,
+    val success: Color,
+    val warning: Color,
+    val error: Color,
+    val info: Color,
     val isDark: Boolean
 )
 
@@ -154,12 +187,12 @@ data class AppTextStyles(
     val heading2: TextStyle = TextStyle(fontSize = 20.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.3).sp),
     val heading3: TextStyle = TextStyle(fontSize = 16.sp, fontWeight = FontWeight.SemiBold),
     val body: TextStyle = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Normal, lineHeight = 20.sp),
-    val bodySmall: TextStyle = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Normal, lineHeight = 16.sp),
-    val label: TextStyle = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.Medium, letterSpacing = 0.5.sp),
+    val bodySmall: TextStyle = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Normal, lineHeight = 18.sp),
+    val label: TextStyle = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Medium, letterSpacing = 0.45.sp),
     val code: TextStyle = TextStyle(fontSize = 13.sp, fontFamily = FontFamily.Monospace, lineHeight = 18.sp),
-    val codeSmall: TextStyle = TextStyle(fontSize = 11.sp, fontFamily = FontFamily.Monospace, lineHeight = 15.sp),
+    val codeSmall: TextStyle = TextStyle(fontSize = 12.sp, fontFamily = FontFamily.Monospace, lineHeight = 17.sp),
     val button: TextStyle = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.3.sp),
-    val caption: TextStyle = TextStyle(fontSize = 10.sp, fontWeight = FontWeight.Normal, letterSpacing = 0.4.sp)
+    val caption: TextStyle = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.Normal, letterSpacing = 0.35.sp)
 )
 
 // ─── Legacy AppTypography (backward compatibility) ──────────────
@@ -310,6 +343,13 @@ fun PostSyncProTheme(
             divider = DarkPalette.divider,
             overlay = DarkPalette.overlay,
             codeBg = DarkPalette.codeBg,
+            accent = Color(0xFF9298FF),
+            accentHover = Color(0xFFAEB2FF),
+            onAccent = Color(0xFF0A0D14),
+            success = Color(0xFF54D68A),
+            warning = Color(0xFFFFC857),
+            error = Color(0xFFFF707A),
+            info = Color(0xFF63B3FF),
             isDark = true
         )
     } else {
@@ -334,14 +374,21 @@ fun PostSyncProTheme(
             divider = LightPalette.divider,
             overlay = LightPalette.overlay,
             codeBg = LightPalette.codeBg,
+            accent = Color(0xFF4F46E5),
+            accentHover = Color(0xFF4338CA),
+            onAccent = Color.White,
+            success = Color(0xFF137A45),
+            warning = Color(0xFF8A5200),
+            error = Color(0xFFBF2533),
+            info = Color(0xFF075FA8),
             isDark = false
         )
     }
 
     val colorScheme = if (isDarkTheme) {
         darkColorScheme(
-            primary = BrandColors.Orange,
-            onPrimary = Color.White,
+            primary = palette.accent,
+            onPrimary = palette.onAccent,
             primaryContainer = BrandColors.OrangeDark,
             secondary = BrandColors.Purple,
             background = palette.background,
@@ -352,12 +399,12 @@ fun PostSyncProTheme(
             onSurfaceVariant = palette.textSecondary,
             outline = palette.border,
             outlineVariant = palette.borderSubtle,
-            error = StatusColors.Error
+            error = palette.error
         )
     } else {
         lightColorScheme(
-            primary = BrandColors.Orange,
-            onPrimary = Color.White,
+            primary = palette.accent,
+            onPrimary = palette.onAccent,
             primaryContainer = BrandColors.OrangeLight,
             secondary = BrandColors.Purple,
             background = palette.background,
@@ -368,7 +415,7 @@ fun PostSyncProTheme(
             onSurfaceVariant = palette.textSecondary,
             outline = palette.border,
             outlineVariant = palette.borderSubtle,
-            error = StatusColors.Error
+            error = palette.error
         )
     }
 

@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -149,6 +150,7 @@ fun IssueTrackerScreen(viewModel: IssueTrackerViewModel) {
                             colors = issueTrackerTextFieldColors(palette),
                             singleLine = true,
                             enabled = !state.config.isConnected,
+                            visualTransformation = PasswordVisualTransformation(),
                             textStyle = typography.body.copy(color = palette.textPrimary)
                         )
                     }

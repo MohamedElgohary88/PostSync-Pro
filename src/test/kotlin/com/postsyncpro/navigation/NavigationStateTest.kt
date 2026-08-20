@@ -45,7 +45,7 @@ class NavigationStateTest {
 
     @Test
     fun `cannot navigate to workspace screens before onboarding`() {
-        nav.navigateTo(Screen.SYNC)
+        nav.navigateTo(Screen.WORKBENCH)
         assertEquals(Screen.ONBOARDING, nav.currentScreen)
     }
 
@@ -183,6 +183,50 @@ class NavigationStateTest {
         assertEquals(Screen.SYNC, nav.currentScreen)
     }
 
+    @Test
+    fun `global back and forward preserve navigation history`() {
+        nav.completeOnboarding()
+        nav.navigateTo(Screen.WORKBENCH)
+        nav.navigateTo(Screen.FUZZ)
+
+        assertTrue(nav.canNavigateBack)
+        nav.navigateBack()
+        assertEquals(Screen.WORKBENCH, nav.currentScreen)
+        assertTrue(nav.canNavigateForward)
+
+        nav.navigateForward()
+        assertEquals(Screen.FUZZ, nav.currentScreen)
+    }
+
+    @Test
+    fun `new navigation clears forward history`() {
+        nav.completeOnboarding()
+        nav.navigateTo(Screen.WORKBENCH)
+        nav.navigateTo(Screen.FUZZ)
+        nav.navigateBack()
+
+        nav.navigateTo(Screen.VALIDATOR)
+
+        assertFalse(nav.canNavigateForward)
+        assertEquals(Screen.VALIDATOR, nav.currentScreen)
+    }
+
+    @Test
+    fun `context back after global back and forward consumes matching history entry`() {
+        nav.completeOnboarding()
+        nav.navigateTo(Screen.SETTINGS)
+
+        nav.navigateBack()
+        assertEquals(Screen.SYNC, nav.currentScreen)
+        nav.navigateForward()
+        assertEquals(Screen.SETTINGS, nav.currentScreen)
+
+        nav.navigateBackFromSettings()
+        assertEquals(Screen.SYNC, nav.currentScreen)
+        assertFalse(nav.canNavigateBack)
+        assertTrue(nav.canNavigateForward)
+    }
+
     // ─── Pro Feature Navigation Chain ─────────────────────────────
 
     @Test
@@ -278,9 +322,9 @@ class NavigationStateTest {
     }
 
     @Test
-    fun `WORKSPACE section has exactly 3 screens`() {
+    fun `WORKSPACE section includes workbench and core screens`() {
         val workspaceScreens = Screen.entries.filter { it.section == "WORKSPACE" }
-        // ONBOARDING, SYNC, VALIDATOR, FUZZ
-        assertEquals(4, workspaceScreens.size)
+        // ONBOARDING, WORKBENCH, SYNC, VALIDATOR, FUZZ
+        assertEquals(5, workspaceScreens.size)
     }
 }

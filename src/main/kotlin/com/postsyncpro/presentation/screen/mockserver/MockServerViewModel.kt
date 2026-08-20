@@ -108,7 +108,10 @@ class MockServerViewModel(
                 withContext(Dispatchers.IO) {
                     mockServerRepository.startServer(config, _state.value.routes)
                 }
-                _state.value = _state.value.copy(isRunning = true, error = null)
+                _state.value = _state.value.copy(
+                    isRunning = mockServerRepository.isRunning(),
+                    error = null
+                )
             } catch (e: Exception) {
                 _state.value = _state.value.copy(error = "Failed to start: ${e.message}")
             }
@@ -159,11 +162,11 @@ class MockServerViewModel(
     }
 
     fun onCleared() {
-        scope.launch {
-            if (_state.value.isRunning) {
+        scope.cancel()
+        runBlocking(Dispatchers.IO) {
+            runCatching {
                 mockServerRepository.stopServer()
             }
         }
-        scope.cancel()
     }
 }

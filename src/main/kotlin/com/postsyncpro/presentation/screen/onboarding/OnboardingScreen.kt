@@ -956,6 +956,7 @@ private fun LocalSetupPanel(
                 it.substringAfterLast("/").substringAfterLast("\\")
             },
             fileExtensions = listOf("gguf"),
+            onSelectionCleared = { viewModel.updateLocalModelPath("") },
             onFileSelected = { file -> viewModel.updateLocalModelPath(file.absolutePath) }
         )
 
@@ -1416,7 +1417,7 @@ private fun ConfirmationStep(
                             icon = Icons.Default.Key,
                             label = strings.apiKey,
                             value = if (state.apiKey.isNotBlank())
-                                "${state.apiKey.take(6)}${"*".repeat(12)}"
+                                "•".repeat(12)
                             else "Not set"
                         )
                     }

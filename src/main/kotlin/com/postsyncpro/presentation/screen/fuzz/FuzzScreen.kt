@@ -20,6 +20,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -96,7 +98,9 @@ private fun EndpointBrowserPanel(
             ) {
                 FilePickerButton(
                     label = if (state.swaggerFileName.isNotEmpty()) state.swaggerFileName else strings.loadSwagger,
+                    selectedFile = state.swaggerFileName.takeIf { it.isNotEmpty() },
                     fileExtensions = listOf("json", "yaml", "yml"),
+                    onSelectionCleared = viewModel::clearSwaggerFile,
                     onFileSelected = { file -> file?.let { viewModel.loadSwaggerFile(it) } }
                 )
             }
@@ -383,7 +387,8 @@ private fun ConfigurationPanel(
                     value = state.authHeader,
                     onValueChange = viewModel::updateAuthHeader,
                     placeholder = strings.authHeaderPlaceholder,
-                    icon = Icons.Default.Lock
+                    icon = Icons.Default.Lock,
+                    isSecret = true
                 )
 
                 // Mutation Types
@@ -869,7 +874,8 @@ private fun InputField(
     value: String,
     onValueChange: (String) -> Unit,
     placeholder: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    isSecret: Boolean = false
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(AppDimensions.spacingXxs)) {
         Text(
@@ -897,6 +903,7 @@ private fun InputField(
                 )
             },
             singleLine = true,
+            visualTransformation = if (isSecret) PasswordVisualTransformation() else VisualTransformation.None,
             textStyle = AppTypography.codeMedium,
             shape = RoundedCornerShape(AppDimensions.cornerSmall),
             colors = OutlinedTextFieldDefaults.colors(

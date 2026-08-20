@@ -52,7 +52,9 @@ data class DownloadableModel(
     val quantization: String,
     val parameters: String,
     val contextLength: Int,
-    val recommended: Boolean = false
+    val recommended: Boolean = false,
+    /** Expected SHA-256 for the exact GGUF payload. */
+    val sha256: String = ""
 )
 
 data class ModelDownloadProgress(
@@ -78,12 +80,13 @@ object AvailableModels {
             description = "Microsoft's compact model. Best balance of speed and quality for QA tasks.",
             fileName = "Phi-3-mini-4k-instruct-q4.gguf",
             downloadUrl = "$HF_BASE/microsoft/Phi-3-mini-4k-instruct-gguf/resolve/main/Phi-3-mini-4k-instruct-q4.gguf",
-            sizeBytes = 2_400_000_000L,
+            sizeBytes = 2_393_231_072L,
             sizeDisplay = "2.3 GB",
             minRamGb = 4,
             quantization = "Q4_K_M",
             parameters = "3.8B",
             contextLength = 4096,
+            sha256 = "8a83c7fb9049a9b2e92266fa7ad04933bb53aa1e85136b7b30f1b8000ff2edef",
             recommended = true
         ),
         DownloadableModel(
@@ -92,12 +95,13 @@ object AvailableModels {
             description = "Meta's smallest model. Ultra-fast inference, ideal for quick analysis.",
             fileName = "Llama-3.2-1B-Instruct-Q4_K_M.gguf",
             downloadUrl = "$HF_BASE/bartowski/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q4_K_M.gguf",
-            sizeBytes = 750_000_000L,
+            sizeBytes = 807_694_464L,
             sizeDisplay = "0.75 GB",
             minRamGb = 2,
             quantization = "Q4_K_M",
             parameters = "1B",
             contextLength = 8192,
+            sha256 = "6f85a640a97cf2bf5b8e764087b1e83da0fdb51d7c9fab7d0fece9385611df83",
             recommended = false
         ),
         DownloadableModel(
@@ -106,12 +110,13 @@ object AvailableModels {
             description = "Meta's balanced model. Great quality for SRS analysis and rule extraction.",
             fileName = "Llama-3.2-3B-Instruct-Q4_K_M.gguf",
             downloadUrl = "$HF_BASE/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf",
-            sizeBytes = 2_020_000_000L,
+            sizeBytes = 2_019_377_696L,
             sizeDisplay = "1.9 GB",
             minRamGb = 4,
             quantization = "Q4_K_M",
             parameters = "3B",
             contextLength = 8192,
+            sha256 = "6c1a2b41161032677be168d354123594c0e6e67d2b9227c84f296ad037c728ff",
             recommended = false
         )
     )

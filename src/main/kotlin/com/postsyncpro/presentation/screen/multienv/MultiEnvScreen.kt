@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -254,6 +255,7 @@ fun MultiEnvScreen(viewModel: MultiEnvViewModel) {
                                 },
                                 textStyle = AppTypography.codeMedium.copy(color = palette.textPrimary),
                                 singleLine = true,
+                                visualTransformation = PasswordVisualTransformation(),
                                 colors = TextFieldDefaults.outlinedTextFieldColors(
                                     textColor = palette.textPrimary,
                                     backgroundColor = palette.codeBg,

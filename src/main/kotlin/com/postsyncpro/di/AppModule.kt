@@ -17,22 +17,55 @@ import com.postsyncpro.presentation.screen.breakingchange.BreakingChangeViewMode
 import com.postsyncpro.presentation.screen.regression.RegressionViewModel
 import com.postsyncpro.presentation.screen.dependencygraph.DependencyGraphViewModel
 import com.postsyncpro.presentation.screen.autoflow.AutoFlowViewModel
+import com.postsyncpro.presentation.screen.workbench.WorkbenchViewModel
+import io.ktor.client.HttpClient
 import kotlinx.coroutines.runBlocking
+import org.koin.core.module.dsl.onClose
+import org.koin.core.module.dsl.withOptions
+import org.koin.core.qualifier.named
 import org.koin.dsl.module
+import java.nio.file.Path
+
+private const val WORKBENCH_HTTP_CLIENT = "workbenchHttpClient"
 
 val appModule = module {
     // Network
-    single { AiApiClient.create() }
+    single<HttpClient> { AiApiClient.create() }.withOptions { onClose { it?.close() } }
+    single<HttpClient>(named(WORKBENCH_HTTP_CLIENT)) { AiApiClient.createForWorkbench() }
+        .withOptions { onClose { it?.close() } }
 
     // Repositories
     single<PostmanSyncRepository> { PostmanSyncRepositoryImpl() }
     single<ValidationRepository> { ValidationRepositoryImpl() }
     single<SettingsRepository> { SettingsRepositoryImpl() }
-    single { FuzzTestRepositoryImpl(AiApiClient.createForFuzzTesting()) as FuzzTestRepository }
+    single<FuzzTestRepository> { FuzzTestRepositoryImpl(AiApiClient.createForFuzzTesting()) }
+        .withOptions { onClose { (it as? AutoCloseable)?.close() } }
     single<ReportRepository> { PdfReportRepositoryImpl() }
     single<MockServerRepository> { MockServerRepositoryImpl() }
-    single<TestChainRepository> { TestChainRepositoryImpl(AiApiClient.create()) }
+    single<TestChainRepository> { TestChainRepositoryImpl(get()) }
     single<com.postsyncpro.domain.repository.RegressionRepository> { RegressionRepositoryImpl() }
+    single { SecretRedactor() }
+    single<WorkbenchRequestRepository> {
+        KtorWorkbenchRequestRepository(get(named(WORKBENCH_HTTP_CLIENT)), get())
+    }
+    single<WorkbenchHistoryRepository> {
+        FileWorkbenchHistoryRepository(
+            file = Path.of(System.getProperty("user.home"), ".postsyncpro", "workbench-history.json"),
+            redactor = get()
+        )
+    }
+    single<WorkbenchEnvironmentRepository> {
+        FileWorkbenchEnvironmentRepository(
+            file = Path.of(System.getProperty("user.home"), ".postsyncpro", "workbench-environments.json"),
+            redactor = get()
+        )
+    }
+    single<WorkbenchSavedRequestRepository> {
+        FileWorkbenchSavedRequestRepository(
+            file = Path.of(System.getProperty("user.home"), ".postsyncpro", "workbench-library.json"),
+            redactor = get()
+        )
+    }
 
     // AI Repository - loads saved config from settings on creation
     factory<AiAnalyzerRepository> {
@@ -72,6 +105,11 @@ val appModule = module {
     factory { AnalyzeCoverageUseCase() }
     factory { RegressionAnalysisUseCase(get()) }
     factory { AutoFlowUseCase() }
+    factory { ResolveWorkbenchVariablesUseCase() }
+    factory { ExecuteWorkbenchRequestUseCase(get()) }
+    factory { PrepareContractRequestUseCase(get()) }
+    factory { ValidateContractResponseUseCase() }
+    factory { EvaluateWorkbenchAssertionsUseCase(secretRedactor = get()) }
 
     // ViewModels
     factory { OnboardingViewModel(get(), get()) }
@@ -87,4 +125,5 @@ val appModule = module {
     factory { RegressionViewModel(get()) }
     factory { DependencyGraphViewModel(get(), get()) }
     factory { AutoFlowViewModel(get(), get(), get()) }
+    factory { WorkbenchViewModel(get(), get(), get(), get(), get(), get(), get(), get(), get()) }
 }

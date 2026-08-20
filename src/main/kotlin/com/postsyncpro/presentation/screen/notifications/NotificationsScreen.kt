@@ -19,6 +19,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -144,7 +146,8 @@ fun NotificationsScreen(viewModel: NotificationsViewModel) {
                             onValueChange = { viewModel.updateEditing(channel.copy(webhookUrl = it)) },
                             palette = palette,
                             typography = typography,
-                            accent = accent
+                            accent = accent,
+                            isSecret = true
                         )
                     }
 
@@ -490,7 +493,8 @@ private fun InputField(
     onValueChange: (String) -> Unit,
     palette: AppPalette,
     typography: AppTextStyles,
-    accent: Color
+    accent: Color,
+    isSecret: Boolean = false
 ) {
     Column(
         verticalArrangement = Arrangement.spacedBy(AppDimensions.spacingXs)
@@ -505,6 +509,7 @@ private fun InputField(
             modifier = Modifier.fillMaxWidth(),
             textStyle = typography.code.copy(color = palette.textPrimary),
             singleLine = true,
+            visualTransformation = if (isSecret) PasswordVisualTransformation() else VisualTransformation.None,
             placeholder = {
                 Text(
                     text = placeholder,
@@ -595,7 +600,11 @@ private fun ChannelCard(
         NotificationProvider.EMAIL -> strings.notificationsEmail
     }
 
-    val target = if (channel.provider == NotificationProvider.EMAIL) channel.emailAddress else channel.webhookUrl
+    val target = if (channel.provider == NotificationProvider.EMAIL) {
+        channel.emailAddress
+    } else {
+        maskWebhookTarget(channel.webhookUrl)
+    }
 
     Column(
         modifier = Modifier
@@ -816,6 +825,15 @@ private fun ChannelCard(
             }
         }
     }
+}
+
+private fun maskWebhookTarget(value: String): String {
+    if (value.isBlank()) return ""
+    return runCatching {
+        val uri = java.net.URI(value)
+        val origin = listOfNotNull(uri.scheme, uri.host).joinToString("://")
+        if (origin.isBlank()) "••••••••" else "$origin/••••"
+    }.getOrDefault("••••••••")
 }
 
 // ── Small Event Tag ─────────────────────────────────────────────
