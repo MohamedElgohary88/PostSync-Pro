@@ -6,12 +6,21 @@ import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
+import io.ktor.utils.io.*
 import kotlinx.serialization.json.*
+import java.io.ByteArrayOutputStream
+import java.nio.charset.StandardCharsets
 
 class CloudAiAnalyzerImpl(
     private val cloudConfig: CloudAiConfig,
     private val httpClient: HttpClient
 ) : AiAnalyzerRepository {
+
+    private companion object {
+        const val MAX_PROMPT_INPUT_CHARS = 2_000_000
+        const val MAX_TARGET_ENDPOINT_CHARS = 4_096
+        const val MAX_AI_RESPONSE_BYTES = 2 * 1024 * 1024
+    }
 
     private val json = Json {
         ignoreUnknownKeys = true
@@ -19,6 +28,8 @@ class CloudAiAnalyzerImpl(
     }
 
     override suspend fun extractRulesFromText(text: String, targetEndpoint: String): SrsExtractionResult {
+        require(text.length <= MAX_PROMPT_INPUT_CHARS) { "Requirements document is too large" }
+        require(targetEndpoint.length <= MAX_TARGET_ENDPOINT_CHARS) { "Target endpoint is too large" }
         val prompt = buildExtractionPrompt(text, targetEndpoint)
         val aiResponseText = when (cloudConfig.provider) {
             CloudProvider.GEMINI -> callGeminiApi(prompt)
@@ -32,16 +43,16 @@ class CloudAiAnalyzerImpl(
         return try {
             when (cloudConfig.provider) {
                 CloudProvider.GEMINI -> {
-                    val response = httpClient.get(
-                        "${cloudConfig.provider.baseUrl}/models?key=${cloudConfig.apiKey}"
-                    )
-                    response.status.isSuccess()
+                    val response = httpClient.get("${cloudConfig.provider.baseUrl}/models") {
+                        header("x-goog-api-key", cloudConfig.apiKey)
+                    }
+                    response.status.isSuccess().also { response.bodyAsChannel().cancel() }
                 }
                 CloudProvider.GROQ -> {
                     val response = httpClient.get("${cloudConfig.provider.baseUrl}/models") {
                         header(HttpHeaders.Authorization, "Bearer ${cloudConfig.apiKey}")
                     }
-                    response.status.isSuccess()
+                    response.status.isSuccess().also { response.bodyAsChannel().cancel() }
                 }
             }
         } catch (e: Exception) {
@@ -56,7 +67,7 @@ class CloudAiAnalyzerImpl(
 
     private suspend fun callGeminiApi(prompt: String): String {
         val model = cloudConfig.model.ifEmpty { cloudConfig.provider.defaultModel }
-        val url = "${cloudConfig.provider.baseUrl}/models/$model:generateContent?key=${cloudConfig.apiKey}"
+        val url = "${cloudConfig.provider.baseUrl}/models/$model:generateContent"
 
         val requestBody = buildJsonObject {
             putJsonArray("contents") {
@@ -72,14 +83,16 @@ class CloudAiAnalyzerImpl(
 
         val response = httpClient.post(url) {
             contentType(ContentType.Application.Json)
+            header("x-goog-api-key", cloudConfig.apiKey)
             setBody(requestBody.toString())
         }
 
         if (!response.status.isSuccess()) {
-            throw RuntimeException("Gemini API error: ${response.status.value} - ${response.bodyAsText()}")
+            response.bodyAsChannel().cancel()
+            throw RuntimeException("Gemini API error: HTTP ${response.status.value}")
         }
 
-        val responseJson = json.parseToJsonElement(response.bodyAsText()).jsonObject
+        val responseJson = json.parseToJsonElement(response.bodyAsTextLimited()).jsonObject
         return responseJson["candidates"]
             ?.jsonArray?.firstOrNull()
             ?.jsonObject?.get("content")
@@ -117,10 +130,11 @@ class CloudAiAnalyzerImpl(
         }
 
         if (!response.status.isSuccess()) {
-            throw RuntimeException("Groq API error: ${response.status.value} - ${response.bodyAsText()}")
+            response.bodyAsChannel().cancel()
+            throw RuntimeException("Groq API error: HTTP ${response.status.value}")
         }
 
-        val responseJson = json.parseToJsonElement(response.bodyAsText()).jsonObject
+        val responseJson = json.parseToJsonElement(response.bodyAsTextLimited()).jsonObject
         return responseJson["choices"]
             ?.jsonArray?.firstOrNull()
             ?.jsonObject?.get("message")
@@ -238,5 +252,30 @@ Respond ONLY with the JSON object, no additional text."""
         }
 
         return text.trim()
+    }
+
+    private suspend fun HttpResponse.bodyAsTextLimited(): String {
+        val declaredLength = contentLength()
+        if (declaredLength != null && declaredLength > MAX_AI_RESPONSE_BYTES) {
+            bodyAsChannel().cancel(IllegalStateException("AI response is too large"))
+            throw IllegalStateException("AI response is too large")
+        }
+
+        val channel = bodyAsChannel()
+        val output = ByteArrayOutputStream(minOf(MAX_AI_RESPONSE_BYTES, 8_192))
+        val buffer = ByteArray(8_192)
+        var total = 0
+        while (true) {
+            val read = channel.readAvailable(buffer)
+            if (read == -1) break
+            if (read == 0) continue
+            if (total > MAX_AI_RESPONSE_BYTES - read) {
+                channel.cancel(IllegalStateException("AI response is too large"))
+                throw IllegalStateException("AI response is too large")
+            }
+            output.write(buffer, 0, read)
+            total += read
+        }
+        return output.toString(StandardCharsets.UTF_8)
     }
 }

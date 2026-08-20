@@ -7,7 +7,7 @@
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.0+-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org)
 [![Compose Desktop](https://img.shields.io/badge/Compose_Desktop-1.7+-4285F4?logo=jetpackcompose&logoColor=white)](https://www.jetbrains.com/lp/compose-multiplatform/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/Tests-202_passing-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-Gradle-brightgreen)]()
 
 </div>
 
@@ -15,12 +15,13 @@
 
 ## What is PostSync Pro?
 
-A desktop application that brings together API testing, Postman collection management, and QA automation into one tool. Built entirely with **Kotlin** and **Jetpack Compose Desktop**.
+A desktop application that brings together contract-aware API execution, Postman collection management, and QA automation in one local-first tool. Built with **Kotlin** and **Jetpack Compose Desktop**.
 
 ### Core Features
 
 | Feature | Description |
 |---|---|
+| **API Workbench v2** | Send REST requests, switch named environments, save requests in local collections, run safe declarative assertions, prefill from OpenAPI, validate live responses, and replay a redacted bounded history |
 | **Postman Sync** | Merge old Postman collections with new Swagger/OpenAPI specs, preserving test scripts |
 | **SRS Validator** | Validate API specs against Software Requirements using AI |
 | **Fuzz Testing** | Generate fuzz test cases (SQL injection, XSS, boundary values) |
@@ -33,7 +34,9 @@ A desktop application that brings together API testing, Postman collection manag
 | **Regression** | Track test results over time, detect regressions |
 | **Dependency Graph** | Visualize API endpoint relationships |
 
-### Pro Features
+### Preview surfaces
+
+The following screens are product previews. They are clearly marked in the UI when they use simulated data; they must not be treated as production integrations yet.
 
 | Feature | Description |
 |---|---|
@@ -50,9 +53,18 @@ A desktop application that brings together API testing, Postman collection manag
 
 ---
 
-## Screenshots
+## API Workbench v2
 
-> _Coming soon — contributions welcome!_
+Workbench v2 extends the contract-aware REST client without weakening its local security boundary:
+
+- **Named environments:** create, update, select, and delete reusable variable sets. Values marked secret—or using credential-shaped names—are encrypted at rest with AES-256-GCM. Non-secret variables and environment metadata remain ordinary local data; the encryption key is file-backed, not an OS keychain.
+- **Collections and saved requests:** organize reusable requests in local collections, search their metadata, and reopen them without copying credential values to disk. Authentication values, secret variables, sensitive fields, URL credentials, sensitive body values, and sensitive assertion operands are removed or replaced with restoration markers before persistence.
+- **Safe custom assertions:** check exact/ranged status, maximum response time, header existence/equality/containment, body containment, and typed JSON-path existence/equality. Evaluation is cancellable and bounded. The JSON-path implementation intentionally supports only root/property/quoted-property/array-index traversal—no filters, wildcards, recursive descent, regular-expression assertions, or executable scripts.
+- **Transient raw responses:** contract validation and assertions can inspect the bounded raw response in memory. Only the separately redacted display response and generic assertion diagnostics may enter UI state or history.
+- **Fail-safe local stores:** environment and saved-request files are size- and schema-validated, symlink-protected, cross-process locked, permission-restricted where supported, and atomically replaced. Corrupt or unsupported stores block normal mutations instead of being silently treated as empty; explicit recovery preserves the raw file as a sibling backup before reset.
+- **URL credential defense:** HTTP(S) `user:password@host` user-info is rejected for execution and redacted from saved drafts, history, and diagnostics. Use the Auth editor instead.
+
+Workbench v2 is local-first. It does not claim arbitrary pre-request/test scripting, a JavaScript sandbox, shared cloud workspaces, or team collaboration.
 
 ---
 
@@ -65,7 +77,7 @@ A desktop application that brings together API testing, Postman collection manag
 - **Networking:** Ktor Client
 - **Serialization:** kotlinx.serialization
 - **Testing:** kotlin.test + MockK
-- **AI Integration:** Anthropic Claude / OpenAI (configurable)
+- **AI Integration:** Google Gemini, Groq, or a local GGUF model
 
 ## Architecture
 
@@ -90,7 +102,7 @@ src/main/kotlin/com/postsyncpro/
     └── theme/         # Dark/Light theme system
 ```
 
-**Stats:** ~33,500 lines of production code | ~2,200 lines of tests | 202 tests
+The Workbench follows a strict transient-raw/persisted-redacted execution pipeline. See [ARCHITECTURE.md](ARCHITECTURE.md) for boundaries and compatibility rules, [SECURITY.md](SECURITY.md) for the implemented threat controls and residual risks, and [ROADMAP.md](ROADMAP.md) for the product sequence.
 
 ---
 
@@ -112,6 +124,7 @@ cd PostSync-Pro
 ### Build distributable
 
 ```bash
+./gradlew createDistributable # unpacked native app for the current OS
 ./gradlew packageDmg        # macOS
 ./gradlew packageMsi        # Windows
 ./gradlew packageDeb        # Linux
@@ -149,7 +162,7 @@ On first launch, the onboarding wizard guides you through:
 2. AI mode selection (Cloud API or Local)
 3. API key configuration
 
-Supports: **Anthropic Claude** and **OpenAI GPT** models.
+Supports **Google Gemini**, **Groq**, and verified downloadable or user-selected local GGUF models.
 
 ---
 
@@ -167,10 +180,10 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 ### Good first issues
 
 - Add more fuzz test patterns
-- Improve light mode color consistency
+- Add Compose UI regression tests for compact and wide Workbench layouts
 - Add new language translations
 - Write UI tests with Compose Testing
-- Add Swagger 2.0 support (currently OpenAPI 3.0 only)
+- Add Swagger 2.0 support (the Workbench currently targets OpenAPI 3.x)
 
 ---
 

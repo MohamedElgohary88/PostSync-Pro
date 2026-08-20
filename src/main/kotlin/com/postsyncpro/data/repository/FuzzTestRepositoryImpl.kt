@@ -6,20 +6,37 @@ import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
+import io.ktor.utils.io.*
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.joinAll
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.flow.channelFlow
+import java.io.ByteArrayOutputStream
+import java.nio.charset.StandardCharsets
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicBoolean
 
 class FuzzTestRepositoryImpl(
     private val httpClient: HttpClient
-) : FuzzTestRepository {
+) : FuzzTestRepository, AutoCloseable {
 
-    @Volatile
-    private var isCancelled: Boolean = false
+    private companion object {
+        const val MAX_CONCURRENCY = 32
+        const val MAX_STORED_RESPONSE_BYTES = 2_000
+        const val TRUNCATED_SUFFIX = "\n[truncated]"
+    }
+
+    private val activeRuns = ConcurrentHashMap.newKeySet<Job>()
+    private val closed = AtomicBoolean(false)
 
     override suspend fun generateTestCases(config: FuzzTestConfig): List<FuzzTestCase> {
+        check(!closed.get()) { "Fuzz test repository is closed" }
         val testCases = mutableListOf<FuzzTestCase>()
 
         val schema = config.endpoint.requestBody?.content?.values?.firstOrNull()?.schema
@@ -225,24 +242,47 @@ class FuzzTestRepositoryImpl(
         return testCases
     }
 
-    override fun executeTests(testCases: List<FuzzTestCase>, config: FuzzTestConfig): Flow<FuzzTestResult> = flow {
-        isCancelled = false
-        val semaphore = Semaphore(config.concurrency)
+    override fun executeTests(testCases: List<FuzzTestCase>, config: FuzzTestConfig): Flow<FuzzTestResult> = channelFlow {
+        check(!closed.get()) { "Fuzz test repository is closed" }
+        val runJob = currentCoroutineContext()[Job]
+            ?: throw IllegalStateException("Fuzz execution requires a coroutine Job")
+        activeRuns.add(runJob)
 
-        for (testCase in testCases) {
-            if (isCancelled) break
+        try {
+            if (testCases.isEmpty()) return@channelFlow
+            val workerCount = config.concurrency
+                .coerceIn(1, MAX_CONCURRENCY)
+                .coerceAtMost(testCases.size)
+            val nextIndex = AtomicInteger(0)
 
-            semaphore.withPermit {
-                if (isCancelled) return@withPermit
-
-                val result = executeTestCase(testCase, config)
-                emit(result)
+            val workers = List(workerCount) {
+                launch {
+                    while (true) {
+                        currentCoroutineContext().ensureActive()
+                        val index = nextIndex.getAndIncrement()
+                        if (index >= testCases.size) break
+                        send(executeTestCase(testCases[index], config))
+                    }
+                }
             }
+            workers.joinAll()
+        } finally {
+            activeRuns.remove(runJob)
         }
     }
 
     override suspend fun cancelTests() {
-        isCancelled = true
+        activeRuns.toList().forEach { job ->
+            job.cancel(CancellationException("Fuzz test run cancelled"))
+        }
+    }
+
+    override fun close() {
+        if (!closed.compareAndSet(false, true)) return
+        activeRuns.toList().forEach { job ->
+            job.cancel(CancellationException("Fuzz test repository closed"))
+        }
+        httpClient.close()
     }
 
     private suspend fun executeTestCase(testCase: FuzzTestCase, config: FuzzTestConfig): FuzzTestResult {
@@ -262,16 +302,18 @@ class FuzzTestRepositoryImpl(
             }
 
             val responseTime = System.currentTimeMillis() - startTime
-            val responseBody = response.bodyAsText()
+            val responseBody = readResponseBodyLimited(response)
             val passed = evaluateResult(testCase.mutationType, response.status.value)
 
             FuzzTestResult(
                 testCase = testCase,
                 httpStatus = response.status.value,
-                responseBody = responseBody.take(2000), // Limit stored response size
+                responseBody = responseBody,
                 responseTimeMs = responseTime,
                 passed = passed
             )
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             val responseTime = System.currentTimeMillis() - startTime
             FuzzTestResult(
@@ -283,6 +325,39 @@ class FuzzTestRepositoryImpl(
                 errorMessage = e.message ?: "Unknown error: ${e::class.simpleName}"
             )
         }
+    }
+
+    private suspend fun readResponseBodyLimited(response: HttpResponse): String {
+        val channel = response.bodyAsChannel()
+        val output = ByteArrayOutputStream(MAX_STORED_RESPONSE_BYTES)
+        val buffer = ByteArray(1_024)
+        var total = 0
+        var truncated = false
+
+        while (true) {
+            val read = channel.readAvailable(buffer)
+            if (read == -1) break
+            if (read == 0) {
+                kotlinx.coroutines.yield()
+                continue
+            }
+
+            val remaining = MAX_STORED_RESPONSE_BYTES - total
+            if (read > remaining) {
+                if (remaining > 0) output.write(buffer, 0, remaining)
+                truncated = true
+                channel.cancel(CancellationException("Response body limit reached"))
+                break
+            }
+
+            output.write(buffer, 0, read)
+            total += read
+        }
+
+        val body = output.toString(StandardCharsets.UTF_8)
+        return if (truncated) {
+            body.take((MAX_STORED_RESPONSE_BYTES - TRUNCATED_SUFFIX.length).coerceAtLeast(0)) + TRUNCATED_SUFFIX
+        } else body
     }
 
     private fun buildRequestUrl(baseUrl: String, endpointPath: String): String {

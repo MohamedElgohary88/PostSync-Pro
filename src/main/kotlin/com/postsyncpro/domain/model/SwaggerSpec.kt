@@ -9,7 +9,8 @@ data class SwaggerSpec(
     val info: SwaggerInfo = SwaggerInfo(),
     val servers: List<SwaggerServer> = emptyList(),
     val paths: Map<String, Map<String, SwaggerOperation>> = emptyMap(),
-    val components: SwaggerComponents? = null
+    val components: SwaggerComponents? = null,
+    val security: List<Map<String, List<String>>> = emptyList()
 )
 
 @Serializable
@@ -22,6 +23,14 @@ data class SwaggerInfo(
 @Serializable
 data class SwaggerServer(
     val url: String = "",
+    val description: String = "",
+    val variables: Map<String, SwaggerServerVariable> = emptyMap()
+)
+
+@Serializable
+data class SwaggerServerVariable(
+    @SerialName("default") val defaultValue: String = "",
+    @SerialName("enum") val enumValues: List<String> = emptyList(),
     val description: String = ""
 )
 
@@ -34,28 +43,33 @@ data class SwaggerOperation(
     val parameters: List<SwaggerParameter> = emptyList(),
     val requestBody: SwaggerRequestBody? = null,
     val responses: Map<String, SwaggerResponse> = emptyMap(),
-    val security: List<Map<String, List<String>>> = emptyList()
+    /** null means inherit root security; an explicit empty list means no auth. */
+    val security: List<Map<String, List<String>>>? = null
 )
 
 @Serializable
 data class SwaggerParameter(
-    val name: String,
-    @SerialName("in") val location: String, // "query", "path", "header", "cookie"
+    val name: String = "",
+    @SerialName("in") val location: String = "", // "query", "path", "header", "cookie"
     val required: Boolean = false,
     val description: String = "",
-    val schema: SwaggerSchema? = null
+    val schema: SwaggerSchema? = null,
+    @SerialName("\$ref") val ref: String = "",
+    val example: JsonElement? = null
 )
 
 @Serializable
 data class SwaggerRequestBody(
     val description: String = "",
     val required: Boolean = false,
-    val content: Map<String, SwaggerMediaType> = emptyMap()
+    val content: Map<String, SwaggerMediaType> = emptyMap(),
+    @SerialName("\$ref") val ref: String = ""
 )
 
 @Serializable
 data class SwaggerMediaType(
-    val schema: SwaggerSchema? = null
+    val schema: SwaggerSchema? = null,
+    val example: JsonElement? = null
 )
 
 @Serializable
@@ -73,19 +87,30 @@ data class SwaggerSchema(
     val minimum: Double? = null,
     val maximum: Double? = null,
     val minLength: Int? = null,
-    val maxLength: Int? = null
+    val maxLength: Int? = null,
+    val pattern: String = "",
+    val minItems: Int? = null,
+    val maxItems: Int? = null,
+    val minProperties: Int? = null,
+    val maxProperties: Int? = null,
+    val uniqueItems: Boolean = false,
+    @SerialName("default") val defaultValue: JsonElement? = null
 )
 
 @Serializable
 data class SwaggerResponse(
     val description: String = "",
-    val content: Map<String, SwaggerMediaType> = emptyMap()
+    val content: Map<String, SwaggerMediaType> = emptyMap(),
+    @SerialName("\$ref") val ref: String = ""
 )
 
 @Serializable
 data class SwaggerComponents(
     val schemas: Map<String, SwaggerSchema> = emptyMap(),
-    val securitySchemes: Map<String, SwaggerSecurityScheme> = emptyMap()
+    val securitySchemes: Map<String, SwaggerSecurityScheme> = emptyMap(),
+    val parameters: Map<String, SwaggerParameter> = emptyMap(),
+    val requestBodies: Map<String, SwaggerRequestBody> = emptyMap(),
+    val responses: Map<String, SwaggerResponse> = emptyMap()
 )
 
 @Serializable

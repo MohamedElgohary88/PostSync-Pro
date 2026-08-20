@@ -16,17 +16,36 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.postsyncpro.presentation.components.AppSidebar
+import com.postsyncpro.presentation.components.CommandPalette
 import com.postsyncpro.presentation.navigation.NavigationState
 import com.postsyncpro.presentation.navigation.Screen
 import com.postsyncpro.presentation.screen.onboarding.OnboardingScreen
+import com.postsyncpro.presentation.screen.onboarding.OnboardingState
 import com.postsyncpro.presentation.screen.onboarding.OnboardingViewModel
 import com.postsyncpro.presentation.screen.sync.SyncScreen
 import com.postsyncpro.presentation.screen.sync.SyncViewModel
+import com.postsyncpro.presentation.screen.workbench.WorkbenchScreen
+import com.postsyncpro.presentation.screen.workbench.WorkbenchViewModel
 import com.postsyncpro.presentation.screen.validator.ValidatorScreen
 import com.postsyncpro.presentation.screen.validator.ValidatorViewModel
 import com.postsyncpro.presentation.screen.fuzz.FuzzScreen
@@ -70,6 +89,7 @@ import com.postsyncpro.presentation.screen.cicdexport.CiCdExportViewModel
 import com.postsyncpro.presentation.screen.smarttests.SmartTestsScreen
 import com.postsyncpro.presentation.screen.smarttests.SmartTestsViewModel
 import com.postsyncpro.domain.usecase.ManageSettingsUseCase
+import com.postsyncpro.domain.model.AiMode
 import com.postsyncpro.presentation.i18n.LocalAppStrings
 import com.postsyncpro.presentation.theme.*
 import org.koin.core.context.GlobalContext
@@ -77,12 +97,23 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
 @Composable
-fun App() {
+fun App(commandPaletteSignal: Int = 0) {
     val navigationState = remember { NavigationState() }
+    var isCommandPaletteVisible by remember { mutableStateOf(false) }
+    val appFocusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(Unit) {
+        appFocusRequester.requestFocus()
+    }
+
+    LaunchedEffect(commandPaletteSignal) {
+        if (commandPaletteSignal > 0) isCommandPaletteVisible = true
+    }
 
     val koin = GlobalContext.get()
     val onboardingViewModel = remember { koin.get<OnboardingViewModel>() }
     val syncViewModel = remember { koin.get<SyncViewModel>() }
+    val workbenchViewModel = remember { koin.get<WorkbenchViewModel>() }
 
     // Track onboarding completion to re-create AI-dependent ViewModels
     val onboardingState by onboardingViewModel.state.collectAsState()
@@ -135,9 +166,30 @@ fun App() {
         val typography = LocalAppTypography.current
 
         Surface(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .focusRequester(appFocusRequester)
+                .focusable()
+                .onPreviewKeyEvent { event ->
+                    if (
+                        event.type == KeyEventType.KeyDown &&
+                        event.key == Key.K &&
+                        (event.isMetaPressed || event.isCtrlPressed)
+                    ) {
+                        isCommandPaletteVisible = !isCommandPaletteVisible
+                        true
+                    } else {
+                        false
+                    }
+                },
             color = palette.background
         ) {
+            Box(modifier = Modifier.fillMaxSize()) {
+            Box(
+                modifier = Modifier.fillMaxSize().then(
+                    if (isCommandPaletteVisible) Modifier.clearAndSetSemantics { } else Modifier
+                )
+            ) {
             if (!navigationState.isOnboardingComplete) {
                 Column(modifier = Modifier.fillMaxSize()) {
                     OnboardingTopBar(palette, typography, navigationState)
@@ -166,11 +218,16 @@ fun App() {
                         }
                     }
 
-                    AppStatusBar(palette, typography, navigationState)
+                    AppStatusBar(palette, typography, navigationState, onboardingState)
                 }
             } else {
                 Column(modifier = Modifier.fillMaxSize()) {
-                    AppTopBar(palette, typography, navigationState)
+                    AppTopBar(
+                        palette = palette,
+                        typography = typography,
+                        navigationState = navigationState,
+                        onOpenCommandPalette = { isCommandPaletteVisible = true }
+                    )
 
                     Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
                         AppSidebar(navigationState = navigationState)
@@ -191,6 +248,7 @@ fun App() {
                             ) { screen ->
                                 when (screen) {
                                     Screen.ONBOARDING -> OnboardingScreen(viewModel = onboardingViewModel)
+                                    Screen.WORKBENCH -> WorkbenchScreen(viewModel = workbenchViewModel)
                                     Screen.SYNC -> SyncScreen(viewModel = syncViewModel)
                                     Screen.VALIDATOR -> ValidatorScreen(viewModel = validatorViewModel)
                                     Screen.FUZZ -> FuzzScreen(viewModel = fuzzViewModel)
@@ -219,22 +277,43 @@ fun App() {
                         }
                     }
 
-                    AppStatusBar(palette, typography, navigationState)
+                    AppStatusBar(palette, typography, navigationState, onboardingState)
                 }
             }
+            }
+
+            CommandPalette(
+                visible = isCommandPaletteVisible,
+                navigationState = navigationState,
+                onDismiss = {
+                    isCommandPaletteVisible = false
+                    appFocusRequester.requestFocus()
+                }
+            )
+            }
         }
+    }
+
+    DisposableEffect(validatorViewModel) {
+        onDispose { validatorViewModel.onCleared() }
+    }
+    DisposableEffect(fuzzViewModel) {
+        onDispose { fuzzViewModel.onCleared() }
+    }
+    DisposableEffect(reportViewModel) {
+        onDispose { reportViewModel.onCleared() }
+    }
+    DisposableEffect(coverageViewModel) {
+        onDispose { coverageViewModel.onCleared() }
     }
 
     DisposableEffect(Unit) {
         onDispose {
             onboardingViewModel.onCleared()
             syncViewModel.onCleared()
-            validatorViewModel.onCleared()
-            fuzzViewModel.onCleared()
-            reportViewModel.onCleared()
+            workbenchViewModel.onCleared()
             mockServerViewModel.onCleared()
             testChainViewModel.onCleared()
-            coverageViewModel.onCleared()
             breakingChangeViewModel.onCleared()
             regressionViewModel.onCleared()
             dependencyGraphViewModel.onCleared()
@@ -267,7 +346,7 @@ private fun OnboardingTopBar(
                 .height(2.dp)
                 .background(
                     androidx.compose.ui.graphics.Brush.horizontalGradient(
-                        listOf(BrandColors.Orange, BrandColors.Purple, BrandColors.OrangeLight)
+                        listOf(palette.accent, BrandColors.Purple, palette.accentHover)
                     )
                 )
         )
@@ -286,13 +365,13 @@ private fun OnboardingTopBar(
                         modifier = Modifier
                             .size(12.dp)
                             .clip(RoundedCornerShape(6.dp))
-                            .background(BrandColors.Orange.copy(alpha = 0.3f))
+                            .background(palette.accent.copy(alpha = 0.3f))
                     )
                     Box(
                         modifier = Modifier
                             .size(8.dp)
                             .clip(RoundedCornerShape(4.dp))
-                            .background(BrandColors.Orange)
+                            .background(palette.accent)
                     )
                 }
                 Spacer(Modifier.width(10.dp))
@@ -312,11 +391,11 @@ private fun OnboardingTopBar(
                     .background(
                         if (onbProHovered)
                             androidx.compose.ui.graphics.Brush.horizontalGradient(
-                                listOf(BrandColors.OrangeDark, BrandColors.Purple)
+                                listOf(palette.accentHover, BrandColors.Purple)
                             )
                         else
                             androidx.compose.ui.graphics.Brush.horizontalGradient(
-                                listOf(BrandColors.Orange, BrandColors.Purple)
+                                listOf(palette.accent, BrandColors.Purple)
                             )
                     )
                     .hoverable(onbProInteraction)
@@ -370,7 +449,8 @@ private fun OnboardingTopBar(
 private fun AppTopBar(
     palette: AppPalette,
     typography: AppTextStyles,
-    navigationState: NavigationState
+    navigationState: NavigationState,
+    onOpenCommandPalette: () -> Unit
 ) {
     Column {
         // Subtle accent gradient line at the very top
@@ -380,7 +460,7 @@ private fun AppTopBar(
                 .height(2.dp)
                 .background(
                     androidx.compose.ui.graphics.Brush.horizontalGradient(
-                        listOf(BrandColors.Orange, BrandColors.Purple, BrandColors.OrangeLight)
+                        listOf(palette.accent, BrandColors.Purple, palette.accentHover)
                     )
                 )
         )
@@ -399,13 +479,13 @@ private fun AppTopBar(
                         modifier = Modifier
                             .size(12.dp)
                             .clip(RoundedCornerShape(6.dp))
-                            .background(BrandColors.Orange.copy(alpha = 0.3f))
+                            .background(palette.accent.copy(alpha = 0.3f))
                     )
                     Box(
                         modifier = Modifier
                             .size(8.dp)
                             .clip(RoundedCornerShape(4.dp))
-                            .background(BrandColors.Orange)
+                            .background(palette.accent)
                     )
                 }
                 Spacer(Modifier.width(10.dp))
@@ -416,6 +496,24 @@ private fun AppTopBar(
             }
 
             Spacer(Modifier.width(24.dp))
+
+            NavigationHistoryButton(
+                icon = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = LocalAppStrings.current.navigateBack,
+                enabled = navigationState.canNavigateBack,
+                palette = palette,
+                onClick = navigationState::navigateBack
+            )
+            Spacer(Modifier.width(4.dp))
+            NavigationHistoryButton(
+                icon = Icons.AutoMirrored.Filled.ArrowForward,
+                contentDescription = LocalAppStrings.current.navigateForward,
+                enabled = navigationState.canNavigateForward,
+                palette = palette,
+                onClick = navigationState::navigateForward
+            )
+
+            Spacer(Modifier.width(12.dp))
 
             // Breadcrumb with subtle pill background
             Box(
@@ -442,6 +540,46 @@ private fun AppTopBar(
                 }
             }
 
+            Spacer(Modifier.width(12.dp))
+
+            val commandInteraction = remember { MutableInteractionSource() }
+            val commandHovered by commandInteraction.collectIsHoveredAsState()
+            val commandShortcut = remember {
+                if (System.getProperty("os.name").contains("mac", ignoreCase = true)) "⌘K" else "Ctrl K"
+            }
+            val quickOpenLabel = LocalAppStrings.current.quickOpen
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(AppDimensions.buttonRadius))
+                    .background(if (commandHovered) palette.surfaceHover else palette.surfaceVariant.copy(alpha = 0.55f))
+                    .border(1.dp, palette.border, RoundedCornerShape(AppDimensions.buttonRadius))
+                    .hoverable(commandInteraction)
+                    .semantics {
+                        role = Role.Button
+                        contentDescription = quickOpenLabel
+                    }
+                    .clickable(onClick = onOpenCommandPalette)
+                    .padding(horizontal = 10.dp, vertical = 5.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    Icons.Default.Search,
+                    contentDescription = null,
+                    tint = palette.textTertiary,
+                    modifier = Modifier.size(14.dp)
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    quickOpenLabel,
+                    style = typography.caption.copy(color = palette.textSecondary)
+                )
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    commandShortcut,
+                    style = typography.caption.copy(color = palette.textTertiary, fontWeight = FontWeight.SemiBold)
+                )
+            }
+
             Spacer(Modifier.weight(1f))
 
             // Pro button with gradient background
@@ -453,11 +591,11 @@ private fun AppTopBar(
                     .background(
                         if (proHovered)
                             androidx.compose.ui.graphics.Brush.horizontalGradient(
-                                listOf(BrandColors.OrangeDark, BrandColors.Purple)
+                                listOf(palette.accentHover, BrandColors.Purple)
                             )
                         else
                             androidx.compose.ui.graphics.Brush.horizontalGradient(
-                                listOf(BrandColors.Orange, BrandColors.Purple)
+                                listOf(palette.accent, BrandColors.Purple)
                             )
                     )
                     .hoverable(proInteraction)
@@ -511,6 +649,28 @@ private fun AppTopBar(
 }
 
 @Composable
+private fun NavigationHistoryButton(
+    icon: ImageVector,
+    contentDescription: String,
+    enabled: Boolean,
+    palette: AppPalette,
+    onClick: () -> Unit
+) {
+    IconButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier.size(30.dp)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            tint = if (enabled) palette.textSecondary else palette.textTertiary.copy(alpha = 0.42f),
+            modifier = Modifier.size(17.dp)
+        )
+    }
+}
+
+@Composable
 private fun ThemeToggleButton(
     palette: AppPalette,
     navigationState: NavigationState
@@ -529,7 +689,7 @@ private fun ThemeToggleButton(
         Icon(
             imageVector = if (navigationState.isDarkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
             contentDescription = LocalAppStrings.current.toggleTheme,
-            tint = if (navigationState.isDarkTheme) BrandColors.OrangeLight else BrandColors.OrangeDark,
+            tint = palette.accent,
             modifier = Modifier.size(AppDimensions.iconSizeMd)
         )
     }
@@ -539,8 +699,15 @@ private fun ThemeToggleButton(
 private fun AppStatusBar(
     palette: AppPalette,
     typography: AppTextStyles,
-    navigationState: NavigationState
+    navigationState: NavigationState,
+    onboardingState: OnboardingState
 ) {
+    val strings = LocalAppStrings.current
+    val modeLabel = if (onboardingState.selectedMode == AiMode.LOCAL) {
+        strings.localAi
+    } else {
+        "${strings.cloudApi}: ${onboardingState.selectedProvider.displayName}"
+    }
     val currentTime = remember { mutableStateOf(LocalDateTime.now()) }
     LaunchedEffect(Unit) {
         while (true) {
@@ -557,25 +724,26 @@ private fun AppStatusBar(
             .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Pulsing status dot
+        // Session state. This is deliberately not a green "connected" light:
+        // provider reachability is only known after a real request succeeds.
         Box(contentAlignment = Alignment.Center) {
             Box(
                 modifier = Modifier
                     .size(8.dp)
                     .clip(RoundedCornerShape(4.dp))
-                    .background(StatusColors.Success.copy(alpha = 0.2f))
+                    .background(BrandColors.Blue.copy(alpha = 0.2f))
             )
             Box(
                 modifier = Modifier
                     .size(5.dp)
                     .clip(RoundedCornerShape(3.dp))
-                    .background(StatusColors.Success)
+                    .background(BrandColors.Blue)
             )
         }
         Spacer(Modifier.width(6.dp))
         Text(
-            LocalAppStrings.current.aiModeCloud,
-            style = typography.caption.copy(color = StatusColors.Success, fontWeight = FontWeight.Medium)
+            "${strings.localSession} · $modeLabel",
+            style = typography.caption.copy(color = palette.textSecondary, fontWeight = FontWeight.Medium)
         )
 
         Spacer(Modifier.width(12.dp))
@@ -604,6 +772,17 @@ private fun ProScreenWrapper(
     val palette = LocalAppPalette.current
     val typography = LocalAppTypography.current
     val strings = LocalAppStrings.current
+    val usesSimulatedData = navigationState.currentScreen in setOf(
+        Screen.SCHEDULER,
+        Screen.CUSTOM_FUZZ_RULES,
+        Screen.TEST_HISTORY,
+        Screen.BRANDED_REPORT,
+        Screen.NOTIFICATIONS,
+        Screen.ISSUE_TRACKER,
+        Screen.API_MONITOR,
+        Screen.MULTI_ENV,
+        Screen.SMART_TESTS
+    )
 
     Column(modifier = Modifier.fillMaxSize()) {
         // Back to Pro Features header
@@ -616,7 +795,7 @@ private fun ProScreenWrapper(
             Row(
                 modifier = Modifier
                     .clip(RoundedCornerShape(AppDimensions.buttonRadius))
-                    .background(if (backHovered) BrandColors.Orange.copy(alpha = 0.1f) else Color.Transparent)
+                    .background(if (backHovered) palette.accent.copy(alpha = 0.1f) else Color.Transparent)
                     .hoverable(backInteraction)
                     .clickable { navigationState.navigateBackFromPro() }
                     .padding(horizontal = 10.dp, vertical = 6.dp),
@@ -625,13 +804,13 @@ private fun ProScreenWrapper(
                 Icon(
                     Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = strings.back,
-                    tint = BrandColors.Orange,
+                    tint = palette.accent,
                     modifier = Modifier.size(16.dp)
                 )
                 Spacer(Modifier.width(6.dp))
                 Text(
                     strings.proTitle,
-                    style = typography.bodySmall.copy(color = BrandColors.Orange, fontWeight = FontWeight.SemiBold)
+                    style = typography.bodySmall.copy(color = palette.accent, fontWeight = FontWeight.SemiBold)
                 )
             }
             Spacer(Modifier.width(12.dp))
@@ -646,6 +825,43 @@ private fun ProScreenWrapper(
                 navigationState.currentScreen.title(strings),
                 style = typography.heading3.copy(color = palette.textPrimary, fontWeight = FontWeight.Bold)
             )
+        }
+        if (usesSimulatedData) {
+            Spacer(Modifier.height(12.dp))
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = palette.warning.copy(alpha = if (palette.isDark) 0.10f else 0.08f),
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    palette.warning.copy(alpha = 0.34f)
+                ),
+                shape = RoundedCornerShape(AppDimensions.buttonRadius)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.Science,
+                        contentDescription = null,
+                        tint = palette.warning,
+                        modifier = Modifier.size(17.dp)
+                    )
+                    Spacer(Modifier.width(9.dp))
+                    Text(
+                        strings.previewFeature,
+                        style = typography.bodySmall.copy(
+                            color = palette.textPrimary,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        strings.simulatedDataNotice,
+                        style = typography.bodySmall.copy(color = palette.textSecondary)
+                    )
+                }
+            }
         }
         Spacer(Modifier.height(16.dp))
         Box(modifier = Modifier.weight(1f)) {

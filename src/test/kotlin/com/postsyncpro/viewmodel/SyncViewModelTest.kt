@@ -121,6 +121,48 @@ class SyncViewModelTest {
         assertTrue(vm.state.value.error != null || vm.state.value.oldCollection == null)
     }
 
+    @Test
+    fun `clearOldCollection removes parsed source and stale merge inputs`() = runTest {
+        val file = File.createTempFile("test-old-clear", ".json").apply {
+            deleteOnExit()
+            writeText("{}")
+        }
+        coEvery { mergeUseCase.parsePostmanCollection(any()) } returns PostmanCollection(
+            info = CollectionInfo("Old", "v2.1"),
+            item = emptyList()
+        )
+        vm.selectOldCollection(file)
+        advanceUntilIdle()
+
+        vm.clearOldCollection()
+
+        assertNull(vm.state.value.oldCollectionFile)
+        assertNull(vm.state.value.oldCollection)
+        assertNull(vm.state.value.mergeResult)
+    }
+
+    @Test
+    fun `clearNewSource removes both possible parsed source types`() = runTest {
+        val file = File.createTempFile("test-new-clear", ".json").apply {
+            deleteOnExit()
+            writeText("{}")
+        }
+        coEvery { mergeUseCase.parseSwaggerSpec(any()) } returns SwaggerSpec(
+            openapi = "3.0.0",
+            info = SwaggerInfo("New", "1"),
+            paths = mapOf("/users" to mapOf("get" to SwaggerOperation()))
+        )
+        vm.selectNewSource(file)
+        advanceUntilIdle()
+
+        vm.clearNewSource()
+
+        assertNull(vm.state.value.newSourceFile)
+        assertNull(vm.state.value.newSwagger)
+        assertNull(vm.state.value.newCollection)
+        assertNull(vm.state.value.mergeResult)
+    }
+
     // ─── Merge ─────────────────────────────────────────────────
 
     @Test

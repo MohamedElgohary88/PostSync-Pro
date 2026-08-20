@@ -1,6 +1,7 @@
 package com.postsyncpro.presentation.navigation
 
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.postsyncpro.presentation.i18n.AppStrings
@@ -9,6 +10,7 @@ import com.postsyncpro.presentation.i18n.stringsFor
 
 enum class Screen(val icon: String, val section: String = "WORKSPACE") {
     ONBOARDING("settings"),
+    WORKBENCH("http"),
     SYNC("sync"),
     VALIDATOR("verified"),
     FUZZ("bug_report"),
@@ -36,6 +38,7 @@ enum class Screen(val icon: String, val section: String = "WORKSPACE") {
 
     fun title(strings: AppStrings): String = when (this) {
         ONBOARDING -> strings.screenSetup
+        WORKBENCH -> strings.screenWorkbench
         SYNC -> strings.screenPostmanSync
         VALIDATOR -> strings.screenSrsValidator
         FUZZ -> strings.screenFuzzTesting
@@ -71,6 +74,9 @@ enum class Screen(val icon: String, val section: String = "WORKSPACE") {
 }
 
 class NavigationState {
+    private val backStack = mutableStateListOf<Screen>()
+    private val forwardStack = mutableStateListOf<Screen>()
+
     var currentScreen by mutableStateOf(Screen.ONBOARDING)
         private set
 
@@ -88,27 +94,74 @@ class NavigationState {
     var previousScreen by mutableStateOf<Screen?>(null)
         private set
 
+    val canNavigateBack: Boolean get() = backStack.isNotEmpty()
+    val canNavigateForward: Boolean get() = forwardStack.isNotEmpty()
+
     fun navigateTo(screen: Screen) {
         if (isOnboardingComplete || screen == Screen.ONBOARDING || screen == Screen.SETTINGS || screen == Screen.PRO_FEATURES || screen.section == "PRO") {
+            if (screen == currentScreen) return
             if (screen == Screen.SETTINGS || screen == Screen.PRO_FEATURES || screen.section == "PRO") {
                 previousScreen = currentScreen
+            } else {
+                previousScreen = null
             }
+            backStack.add(currentScreen)
+            forwardStack.clear()
             currentScreen = screen
         }
     }
 
-    fun navigateBackFromSettings() {
-        currentScreen = previousScreen ?: if (isOnboardingComplete) Screen.SYNC else Screen.ONBOARDING
+    fun navigateBack() {
+        if (backStack.isEmpty()) return
+        forwardStack.add(currentScreen)
+        currentScreen = backStack.removeAt(backStack.lastIndex)
         previousScreen = null
     }
 
-    fun navigateBackFromPro() {
-        currentScreen = previousScreen ?: if (isOnboardingComplete) Screen.SYNC else Screen.ONBOARDING
+    fun navigateForward() {
+        if (forwardStack.isEmpty()) return
+        backStack.add(currentScreen)
+        currentScreen = forwardStack.removeAt(forwardStack.lastIndex)
         previousScreen = null
+    }
+
+    fun navigateBackFromSettings() {
+        navigateBackToContext()
+    }
+
+    fun navigateBackFromPro() {
+        navigateBackToContext()
+    }
+
+    private fun navigateBackToContext() {
+        val target = previousScreen ?: if (isOnboardingComplete) Screen.SYNC else Screen.ONBOARDING
+        previousScreen = null
+
+        if (backStack.lastOrNull() == target) {
+            navigateBack()
+            return
+        }
+
+        val targetIndex = backStack.indexOfLast { it == target }
+        if (targetIndex >= 0) {
+            while (backStack.lastIndex > targetIndex) {
+                backStack.removeAt(backStack.lastIndex)
+            }
+            navigateBack()
+            return
+        }
+
+        if (currentScreen != target) {
+            forwardStack.add(currentScreen)
+            currentScreen = target
+        }
     }
 
     fun completeOnboarding() {
         isOnboardingComplete = true
+        backStack.clear()
+        forwardStack.clear()
+        previousScreen = null
         currentScreen = Screen.SYNC
     }
 
@@ -124,5 +177,7 @@ class NavigationState {
         isOnboardingComplete = false
         currentScreen = Screen.ONBOARDING
         previousScreen = null
+        backStack.clear()
+        forwardStack.clear()
     }
 }

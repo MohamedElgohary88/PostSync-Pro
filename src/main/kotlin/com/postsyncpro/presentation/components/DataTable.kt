@@ -29,6 +29,7 @@ data class TableColumn<T>(
     val header: String,
     val weight: Float = 1f,
     val sortable: Boolean = false,
+    val comparator: Comparator<T>? = null,
     val content: @Composable (T) -> Unit
 )
 
@@ -46,6 +47,14 @@ fun <T> DataTable(
     val typography = LocalAppTypography.current
     var sortColumnIndex by remember { mutableStateOf(-1) }
     var sortDirection by remember { mutableStateOf(SortDirection.NONE) }
+    val displayRows = remember(rows, columns, sortColumnIndex, sortDirection) {
+        val comparator = columns.getOrNull(sortColumnIndex)?.comparator
+        when {
+            sortDirection == SortDirection.NONE || comparator == null -> rows
+            sortDirection == SortDirection.ASC -> rows.sortedWith(comparator)
+            else -> rows.sortedWith(comparator.reversed())
+        }
+    }
 
     Column(
         modifier = modifier
@@ -65,7 +74,7 @@ fun <T> DataTable(
                     modifier = Modifier
                         .weight(column.weight)
                         .then(
-                            if (column.sortable) {
+                            if (column.sortable && column.comparator != null) {
                                 Modifier.clickable {
                                     if (sortColumnIndex == index) {
                                         sortDirection = when (sortDirection) {
@@ -92,14 +101,14 @@ fun <T> DataTable(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    if (column.sortable) {
+                    if (column.sortable && column.comparator != null) {
                         val icon = when {
                             sortColumnIndex == index && sortDirection == SortDirection.ASC -> Icons.Default.ArrowUpward
                             sortColumnIndex == index && sortDirection == SortDirection.DESC -> Icons.Default.ArrowDownward
                             else -> Icons.Default.UnfoldMore
                         }
                         val tint = if (sortColumnIndex == index && sortDirection != SortDirection.NONE) {
-                            BrandColors.Orange
+                            palette.accent
                         } else {
                             palette.textTertiary
                         }
@@ -131,7 +140,7 @@ fun <T> DataTable(
             }
         } else {
             LazyColumn {
-                itemsIndexed(rows) { index, item ->
+                itemsIndexed(displayRows) { index, item ->
                     var isHovered by remember { mutableStateOf(false) }
 
                     val rowBg = when {
@@ -161,7 +170,7 @@ fun <T> DataTable(
                         }
                     }
 
-                    if (index < rows.size - 1) {
+                    if (index < displayRows.size - 1) {
                         HorizontalDivider(
                             color = palette.divider.copy(alpha = 0.5f),
                             thickness = 0.5.dp

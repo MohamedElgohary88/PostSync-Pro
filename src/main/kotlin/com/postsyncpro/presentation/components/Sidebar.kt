@@ -23,6 +23,11 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.LayoutDirection
@@ -59,6 +64,7 @@ fun AppSidebar(
 
     val sections = listOf(
         NavSection(strings.sectionWorkspace, listOf(
+            NavItem(Screen.WORKBENCH, Icons.Default.Http, strings.screenWorkbench, strings.badgeNew, description = strings.hintWorkbench),
             NavItem(Screen.SYNC, Icons.Default.SyncAlt, strings.screenPostmanSync, description = strings.hintPostmanSync),
             NavItem(Screen.VALIDATOR, Icons.AutoMirrored.Filled.FactCheck, strings.screenSrsValidator, description = strings.hintSrsValidator),
             NavItem(Screen.FUZZ, Icons.Default.BugReport, strings.screenFuzzTesting, description = strings.hintFuzzTesting)
@@ -111,7 +117,7 @@ fun AppSidebar(
                         .clip(RoundedCornerShape(5.dp))
                         .background(
                             Brush.radialGradient(
-                                listOf(BrandColors.OrangeLight, BrandColors.Orange)
+                                listOf(palette.accentHover, palette.accent)
                             )
                         )
                 )
@@ -127,7 +133,7 @@ fun AppSidebar(
                     Text(
                         strings.brandSuffix,
                         style = typography.caption.copy(
-                            color = BrandColors.Orange,
+                            color = palette.accent,
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 2.sp
                         )
@@ -218,7 +224,7 @@ fun AppSidebar(
                             .clip(RoundedCornerShape(AppDimensions.buttonRadius))
                             .background(
                                 when {
-                                    isSelected -> BrandColors.Orange.copy(alpha = 0.15f)
+                                    isSelected -> palette.accent.copy(alpha = 0.15f)
                                     langHovered -> palette.surfaceHover
                                     else -> Color.Transparent
                                 }
@@ -226,11 +232,16 @@ fun AppSidebar(
                             .then(
                                 if (isSelected) Modifier.border(
                                     1.dp,
-                                    BrandColors.Orange.copy(alpha = 0.3f),
+                                    palette.accent.copy(alpha = 0.3f),
                                     RoundedCornerShape(AppDimensions.buttonRadius)
                                 ) else Modifier
                             )
                             .hoverable(langInteraction)
+                            .semantics {
+                                role = Role.Button
+                                selected = isSelected
+                                contentDescription = lang.nativeName
+                            }
                             .clickable { navigationState.setLanguage(lang) }
                             .padding(horizontal = 6.dp, vertical = 6.dp),
                         contentAlignment = Alignment.Center
@@ -238,7 +249,7 @@ fun AppSidebar(
                         Text(
                             lang.code.uppercase(),
                             style = typography.caption.copy(
-                                color = if (isSelected) BrandColors.Orange else palette.textSecondary,
+                                color = if (isSelected) palette.accent else palette.textSecondary,
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                 fontSize = 10.sp
                             ),
@@ -322,6 +333,11 @@ private fun SidebarNavItem(
                 .clip(RoundedCornerShape(AppDimensions.buttonRadius))
                 .background(bgColor)
                 .hoverable(interactionSource)
+                .semantics {
+                    role = Role.Button
+                    selected = isSelected
+                    contentDescription = item.label
+                }
                 .clickable(onClick = onClick)
                 .padding(horizontal = 12.dp, vertical = 9.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -333,7 +349,7 @@ private fun SidebarNavItem(
                     .width(3.dp)
                     .height(18.dp)
                     .clip(RoundedCornerShape(2.dp))
-                    .background(BrandColors.Orange)
+                    .background(palette.accent)
             )
             Spacer(Modifier.width(10.dp))
         }
@@ -344,20 +360,20 @@ private fun SidebarNavItem(
                 modifier = Modifier
                     .size(28.dp)
                     .clip(RoundedCornerShape(6.dp))
-                    .background(BrandColors.Orange.copy(alpha = 0.12f)),
+                    .background(palette.accent.copy(alpha = 0.12f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = item.icon,
-                    contentDescription = item.label,
-                    tint = BrandColors.Orange,
+                    contentDescription = null,
+                    tint = palette.accent,
                     modifier = Modifier.size(16.dp)
                 )
             }
         } else {
             Icon(
                 imageVector = item.icon,
-                contentDescription = item.label,
+                contentDescription = null,
                 tint = if (isHovered) palette.textPrimary else palette.textSecondary,
                 modifier = Modifier.size(AppDimensions.iconSizeMd)
             )
@@ -379,13 +395,13 @@ private fun SidebarNavItem(
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(AppDimensions.chipRadius))
-                    .background(BrandColors.Orange.copy(alpha = 0.12f))
+                    .background(palette.accent.copy(alpha = 0.12f))
                     .padding(horizontal = 6.dp, vertical = 2.dp)
             ) {
                 Text(
                     item.badge,
                     style = typography.caption.copy(
-                        color = BrandColors.Orange,
+                        color = palette.accent,
                         fontWeight = FontWeight.Bold,
                         fontSize = 9.sp
                     )
@@ -399,7 +415,7 @@ private fun SidebarNavItem(
             Icon(
                 Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = null,
-                tint = BrandColors.Orange.copy(alpha = 0.6f),
+                tint = palette.accent.copy(alpha = 0.7f),
                 modifier = Modifier.size(14.dp)
             )
         }

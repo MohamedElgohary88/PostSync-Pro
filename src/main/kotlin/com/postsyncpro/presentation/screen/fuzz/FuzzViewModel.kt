@@ -62,9 +62,11 @@ class FuzzViewModel(
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private val _state = MutableStateFlow(FuzzState())
     val state: StateFlow<FuzzState> = _state.asStateFlow()
+    private var loadJob: Job? = null
 
     fun loadSwaggerFile(file: File) {
-        scope.launch {
+        loadJob?.cancel()
+        loadJob = scope.launch {
             try {
                 val (spec, endpoints, baseUrl) = withContext(Dispatchers.IO) {
                     val json = file.readText()
@@ -90,6 +92,16 @@ class FuzzViewModel(
                 _state.value = _state.value.copy(error = "Failed to parse: ${e.message}")
             }
         }
+    }
+
+    fun clearSwaggerFile() {
+        loadJob?.cancel()
+        loadJob = null
+        scope.launch { fuzzUseCase.cancel() }
+        _state.value = FuzzState(
+            selectedMutations = _state.value.selectedMutations,
+            authHeader = _state.value.authHeader
+        )
     }
 
     // Single endpoint selection (clicking an endpoint row)

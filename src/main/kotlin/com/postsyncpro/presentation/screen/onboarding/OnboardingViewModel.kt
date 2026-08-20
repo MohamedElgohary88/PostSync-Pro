@@ -205,6 +205,7 @@ class OnboardingViewModel(
 
     fun onCleared() {
         downloadJobs.values.forEach { it.cancel() }
+        modelDownloader.close()
         scope.cancel()
     }
 }

@@ -108,7 +108,9 @@ fun SyncScreen(viewModel: SyncViewModel) {
                     )
                     FilePickerButton(
                         label = strings.selectCollection,
+                        selectedFile = state.oldCollectionFile?.name,
                         fileExtensions = listOf("json"),
+                        onSelectionCleared = viewModel::clearOldCollection,
                         onFileSelected = { file ->
                             file?.let { viewModel.selectOldCollection(it) }
                         }
@@ -145,7 +147,9 @@ fun SyncScreen(viewModel: SyncViewModel) {
                     )
                     FilePickerButton(
                         label = strings.selectSource,
+                        selectedFile = state.newSourceFile?.name,
                         fileExtensions = listOf("json", "yaml", "yml"),
+                        onSelectionCleared = viewModel::clearNewSource,
                         onFileSelected = { file ->
                             file?.let { viewModel.selectNewSource(it) }
                         }

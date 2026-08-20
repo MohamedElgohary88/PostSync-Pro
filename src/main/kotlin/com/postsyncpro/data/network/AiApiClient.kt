@@ -49,4 +49,18 @@ object AiApiClient {
             expectSuccess = false
         }
     }
+
+    /**
+     * Dedicated client for the interactive workbench. Request lifetime is
+     * enforced per draft by the execution use case, so no conflicting global
+     * timeout is installed here.
+     */
+    fun createForWorkbench(): HttpClient {
+        return HttpClient(CIO) {
+            install(Logging) {
+                level = LogLevel.NONE
+            }
+            expectSuccess = false
+        }
+    }
 }

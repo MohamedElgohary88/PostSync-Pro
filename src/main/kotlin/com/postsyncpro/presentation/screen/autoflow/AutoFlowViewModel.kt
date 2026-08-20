@@ -366,7 +366,7 @@ class AutoFlowViewModel(
         return AutoFlowExport(
             apiTitle = state.config.sourceName,
             apiVersion = state.config.sourceVersion,
-            baseUrl = state.config.baseUrl,
+            baseUrl = AutoFlowExportRedactor.redactText(state.config.baseUrl),
             executedAt = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")),
             totalEndpoints = state.stepResults.size,
             passed = state.passedSteps,
@@ -377,15 +377,17 @@ class AutoFlowViewModel(
                 ExportEndpointDetail(
                     order = index + 1,
                     method = result.step.method,
-                    path = result.step.path,
+                    path = AutoFlowExportRedactor.redactText(result.step.path),
                     category = result.step.category.displayName,
                     httpStatus = result.httpStatus,
                     passed = result.passed,
                     responseTimeMs = result.responseTimeMs,
-                    requestHeaders = result.requestHeaders,
-                    requestBody = result.requestBody.ifBlank { null },
-                    responseBody = result.responseBody.ifBlank { null },
-                    extractedVariables = result.extractedValues
+                    requestHeaders = AutoFlowExportRedactor.redactMap(result.requestHeaders),
+                    requestBody = result.requestBody.ifBlank { null }
+                        ?.let(AutoFlowExportRedactor::redactText),
+                    responseBody = result.responseBody.ifBlank { null }
+                        ?.let(AutoFlowExportRedactor::redactText),
+                    extractedVariables = AutoFlowExportRedactor.redactMap(result.extractedValues)
                 )
             }
         )
@@ -410,9 +412,9 @@ class AutoFlowViewModel(
         export.endpoints.forEachIndexed { index, ep ->
             sb.appendLine("    {")
             sb.appendLine("      \"order\": ${ep.order},")
-            sb.appendLine("      \"method\": \"${ep.method}\",")
+            sb.appendLine("      \"method\": \"${escJson(ep.method)}\",")
             sb.appendLine("      \"path\": \"${escJson(ep.path)}\",")
-            sb.appendLine("      \"category\": \"${ep.category}\",")
+            sb.appendLine("      \"category\": \"${escJson(ep.category)}\",")
             sb.appendLine("      \"http_status\": ${ep.httpStatus},")
             sb.appendLine("      \"passed\": ${ep.passed},")
             sb.appendLine("      \"response_time_ms\": ${ep.responseTimeMs},")
@@ -427,19 +429,14 @@ class AutoFlowViewModel(
 
             // Request body
             if (ep.requestBody != null) {
-                sb.appendLine("      \"request_body\": ${ep.requestBody},")
+                sb.appendLine("      \"request_body\": ${jsonValueOrString(ep.requestBody)},")
             } else {
                 sb.appendLine("      \"request_body\": null,")
             }
 
             // Response body (try to parse as JSON, fallback to string)
             if (ep.responseBody != null) {
-                val isJson = ep.responseBody.trimStart().startsWith("{") || ep.responseBody.trimStart().startsWith("[")
-                if (isJson) {
-                    sb.appendLine("      \"response_body\": ${ep.responseBody},")
-                } else {
-                    sb.appendLine("      \"response_body\": \"${escJson(ep.responseBody)}\",")
-                }
+                sb.appendLine("      \"response_body\": ${jsonValueOrString(ep.responseBody)},")
             } else {
                 sb.appendLine("      \"response_body\": null,")
             }
@@ -467,4 +464,65 @@ class AutoFlowViewModel(
         .replace("\n", "\\n")
         .replace("\r", "\\r")
         .replace("\t", "\\t")
+
+    private fun jsonValueOrString(value: String): String {
+        val parsed = runCatching { Json.parseToJsonElement(value) }.getOrNull()
+        return parsed?.let { Json.encodeToString(JsonElement.serializer(), it) }
+            ?: "\"${escJson(value)}\""
+    }
+}
+
+internal object AutoFlowExportRedactor {
+    private const val REDACTED = "[REDACTED]"
+    private const val MAX_EXPORTED_VALUE_CHARS = 256 * 1024
+
+    private val sensitiveCompactNames = setOf(
+        "authorization", "proxyauthorization", "cookie", "setcookie", "password", "passcode",
+        "secret", "token", "accesstoken", "refreshtoken", "idtoken", "apikey", "xapikey",
+        "xgoogapikey", "xauthtoken", "clientsecret", "privatekey", "credential", "credentials",
+        "session", "sessionid"
+    )
+    private val JSON_SECRET_PATTERN = Regex(
+        """(?i)(\"(?:password|passcode|secret|token|access_token|refresh_token|id_token|api[_-]?key|authorization|cookie|client_secret|private_key)\"\s*:\s*)(\"(?:\\.|[^\"\\])*\"|[^,}\s]+)"""
+    )
+    private val PARAM_SECRET_PATTERN = Regex(
+        """(?i)((?:^|[?&;\s])(?:password|passcode|secret|token|access_token|refresh_token|id_token|api[_-]?key|authorization|client_secret)=)[^&#;\s]*"""
+    )
+    private val AUTH_PATTERN = Regex("""(?i)\b(?:Bearer|Basic)\s+[^\s,;]+""")
+    private val URL_USER_INFO_PATTERN = Regex("""(?i)(https?://)[^/@\s]+@""")
+
+    fun redactMap(values: Map<String, String>): Map<String, String> = values.mapValues { (key, value) ->
+        if (isSensitiveName(key)) REDACTED else redactText(value)
+    }
+
+    fun redactText(value: String): String {
+        var redacted = JSON_SECRET_PATTERN.replace(value) { match ->
+            "${match.groupValues[1]}\"$REDACTED\""
+        }
+        redacted = PARAM_SECRET_PATTERN.replace(redacted) { match ->
+            "${match.groupValues[1]}$REDACTED"
+        }
+        redacted = AUTH_PATTERN.replace(redacted) { match ->
+            "${match.value.substringBefore(' ')} $REDACTED"
+        }
+        redacted = URL_USER_INFO_PATTERN.replace(redacted) { match ->
+            "${match.groupValues[1]}$REDACTED@"
+        }
+        return if (redacted.length <= MAX_EXPORTED_VALUE_CHARS) {
+            redacted
+        } else {
+            redacted.take(MAX_EXPORTED_VALUE_CHARS) + "…[truncated]"
+        }
+    }
+
+    private fun isSensitiveName(name: String): Boolean {
+        val compact = name.lowercase().filter(Char::isLetterOrDigit)
+        return compact in sensitiveCompactNames ||
+            compact.endsWith("password") ||
+            compact.endsWith("apikey") ||
+            compact.endsWith("accesstoken") ||
+            compact.endsWith("refreshtoken") ||
+            compact.endsWith("clientsecret") ||
+            compact.endsWith("privatekey")
+    }
 }

@@ -56,7 +56,7 @@ fun HttpMethodBadge(
     modifier: Modifier = Modifier,
     compact: Boolean = false
 ) {
-    val color = HttpMethodColors.forMethod(method)
+    val color = appHttpMethodColor(method)
 
     Box(
         modifier = modifier
@@ -72,7 +72,7 @@ fun HttpMethodBadge(
     ) {
         Text(
             text = method.uppercase(),
-            fontSize = if (compact) 9.sp else 11.sp,
+            fontSize = if (compact) 11.sp else 12.sp,
             fontWeight = FontWeight.Bold,
             fontFamily = FontFamily.Monospace,
             color = color,

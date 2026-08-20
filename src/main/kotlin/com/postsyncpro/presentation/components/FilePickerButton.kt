@@ -26,6 +26,10 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.onPointerEvent
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.postsyncpro.presentation.theme.*
@@ -43,6 +47,7 @@ fun FilePickerButton(
     label: String,
     selectedFile: String? = null,
     fileExtensions: List<String> = emptyList(),
+    onSelectionCleared: () -> Unit = {},
     onFileSelected: (File) -> Unit
 ) {
     val palette = LocalAppPalette.current
@@ -52,8 +57,8 @@ fun FilePickerButton(
     var internalSelectedFile by remember(selectedFile) { mutableStateOf(selectedFile) }
 
     val shape = RoundedCornerShape(AppDimensions.cardRadius)
-    val dashedBorderColor = if (isHovered) BrandColors.Orange else palette.border
-    val bgColor = if (isHovered) BrandColors.Orange.copy(alpha = 0.05f) else palette.inputBackground
+    val dashedBorderColor = if (isHovered) palette.accent else palette.border
+    val bgColor = if (isHovered) palette.accent.copy(alpha = 0.05f) else palette.inputBackground
 
     // Shared pick logic
     val pickFile: () -> Unit = {
@@ -77,6 +82,10 @@ fun FilePickerButton(
                 .background(bgColor)
                 .onPointerEvent(PointerEventType.Enter) { isHovered = true }
                 .onPointerEvent(PointerEventType.Exit) { isHovered = false }
+                .semantics {
+                    role = Role.Button
+                    contentDescription = label
+                }
                 .clickable { pickFile() }
                 .dashedBorder(
                     color = dashedBorderColor,
@@ -95,13 +104,13 @@ fun FilePickerButton(
                 Icon(
                     imageVector = Icons.Default.UploadFile,
                     contentDescription = null,
-                    tint = if (isHovered) BrandColors.Orange else palette.textTertiary,
+                    tint = if (isHovered) palette.accent else palette.textTertiary,
                     modifier = Modifier.size(32.dp)
                 )
                 Text(
                     text = label,
                     style = typography.body.copy(
-                        color = if (isHovered) BrandColors.Orange else palette.textSecondary
+                        color = if (isHovered) palette.accent else palette.textSecondary
                     )
                 )
                 if (fileExtensions.isNotEmpty()) {
@@ -127,7 +136,7 @@ fun FilePickerButton(
             Icon(
                 imageVector = Icons.Default.Description,
                 contentDescription = null,
-                tint = BrandColors.Orange,
+                tint = palette.accent,
                 modifier = Modifier.size(AppDimensions.iconSizeMd)
             )
             Text(
@@ -140,15 +149,22 @@ fun FilePickerButton(
             // Change file button
             Text(
                 text = "Change",
-                style = typography.label.copy(color = BrandColors.Orange),
+                style = typography.label.copy(color = palette.accent),
                 modifier = Modifier
                     .clip(RoundedCornerShape(AppDimensions.buttonRadius))
+                    .semantics {
+                        role = Role.Button
+                        contentDescription = "Change $label"
+                    }
                     .clickable { pickFile() }
                     .padding(horizontal = 8.dp, vertical = 4.dp)
             )
             // Clear button
             IconButton(
-                onClick = { internalSelectedFile = null },
+                onClick = {
+                    internalSelectedFile = null
+                    onSelectionCleared()
+                },
                 modifier = Modifier.size(20.dp)
             ) {
                 Icon(

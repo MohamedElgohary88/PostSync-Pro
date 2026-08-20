@@ -38,6 +38,9 @@ dependencies {
     implementation("io.ktor:ktor-client-logging:2.3.12")
 
     // Ktor Server (Module 6: Smart Mock Server)
+    // Ktor 2.3.12 pins an old Netty line; keep the compatible 4.1 API while
+    // forcing the security-patched release across every Netty module.
+    implementation(platform("io.netty:netty-bom:4.1.136.Final"))
     implementation("io.ktor:ktor-server-core:2.3.12")
     implementation("io.ktor:ktor-server-netty:2.3.12")
     implementation("io.ktor:ktor-server-content-negotiation:2.3.12")
@@ -46,6 +49,10 @@ dependencies {
 
     // Kotlinx Serialization
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+
+    // Safe OpenAPI YAML parsing + linear-time JSON-schema pattern checks
+    implementation("org.yaml:snakeyaml:2.6")
+    implementation("com.google.re2j:re2j:1.8")
 
     // Koin Dependency Injection
     implementation("io.insert-koin:koin-core:3.5.6")
@@ -70,6 +77,7 @@ dependencies {
     testImplementation(kotlin("test"))
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
     testImplementation("io.mockk:mockk:1.13.12")
+    testImplementation("io.ktor:ktor-client-mock:2.3.12")
 }
 
 compose.desktop {
@@ -77,6 +85,7 @@ compose.desktop {
         mainClass = "com.postsyncpro.MainKt"
 
         nativeDistributions {
+            modules("java.instrument", "java.naming", "java.sql", "jdk.management", "jdk.unsupported")
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = "PostSync Pro"
             packageVersion = "2.0.0"
