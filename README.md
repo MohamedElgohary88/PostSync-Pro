@@ -4,6 +4,8 @@
 
 **Open-source API testing & synchronization toolkit built with Compose Desktop**
 
+Case study: https://mohamedelgohary.dev/product/postsyncpro/
+
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.0+-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org)
 [![Compose Desktop](https://img.shields.io/badge/Compose_Desktop-1.7+-4285F4?logo=jetpackcompose&logoColor=white)](https://www.jetbrains.com/lp/compose-multiplatform/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
